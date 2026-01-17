@@ -839,6 +839,7 @@ export function ProjectTasks() {
           image_ids: null,
           dag_position_x: null,
           dag_position_y: null,
+          clear_dag_position: false,
         });
       } catch (err) {
         console.error('Failed to update task status:', err);

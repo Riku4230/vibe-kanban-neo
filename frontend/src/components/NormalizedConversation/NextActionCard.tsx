@@ -144,6 +144,7 @@ export function NextActionCard({
         image_ids: null,
         dag_position_x: null,
         dag_position_y: null,
+        clear_dag_position: false,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });

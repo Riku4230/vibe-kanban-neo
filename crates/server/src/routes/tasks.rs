@@ -279,8 +279,11 @@ pub async fn update_task(
     )
     .await?;
 
-    // Update DAG position if provided
-    if payload.dag_position_x.is_some() || payload.dag_position_y.is_some() {
+    // Update DAG position if provided, or clear if requested
+    if payload.clear_dag_position {
+        // Clear position to move task back to pool
+        Task::update_dag_position(&deployment.db().pool, existing_task.id, None, None).await?;
+    } else if payload.dag_position_x.is_some() || payload.dag_position_y.is_some() {
         let dag_x = payload.dag_position_x.or(existing_task.dag_position_x);
         let dag_y = payload.dag_position_y.or(existing_task.dag_position_y);
         Task::update_dag_position(&deployment.db().pool, existing_task.id, dag_x, dag_y).await?;

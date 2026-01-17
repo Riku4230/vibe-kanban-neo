@@ -122,7 +122,7 @@ export const TaskDagSidebar = memo(forwardRef<HTMLDivElement, TaskDagSidebarProp
       >
         {/* Drop zone overlay */}
         {isDropTarget && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur-sm border-2 border-dashed border-primary rounded-lg m-2">
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-200/50 dark:bg-slate-700/50 backdrop-blur-[2px] border-2 border-dashed border-primary rounded-lg m-2 pointer-events-none">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
               <Inbox className="w-8 h-8 text-primary" />
             </div>

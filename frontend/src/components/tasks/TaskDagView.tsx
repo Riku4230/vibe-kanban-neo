@@ -372,6 +372,7 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
           image_ids: null,
           dag_position_x: position.x,
           dag_position_y: position.y,
+          clear_dag_position: false,
         },
       });
 
@@ -396,7 +397,13 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
 
   // State to track if dragging over sidebar
   const [isDraggingOverSidebar, setIsDraggingOverSidebar] = useState(false);
-  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  // Ref to track current value for use in callbacks (avoids stale closure)
+  const isDraggingOverSidebarRef = useRef(false);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    isDraggingOverSidebarRef.current = isDraggingOverSidebar;
+  }, [isDraggingOverSidebar]);
 
   // Helper to check if mouse is over sidebar
   const isOverSidebar = useCallback((clientX: number, clientY: number) => {
@@ -412,8 +419,8 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
 
   // Handle node drag start
   const handleNodeDragStart = useCallback(
-    (_event: React.MouseEvent, node: Node<TaskNodeData>) => {
-      setDraggingNodeId(node.id);
+    (_event: React.MouseEvent, _node: Node<TaskNodeData>) => {
+      // Drag started - could track dragging node if needed
     },
     []
   );
@@ -429,10 +436,9 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
 
   // Handle node drag stop - check if dropped on sidebar to move back to pool
   const handleNodeDragStop = useCallback(
-    (event: React.MouseEvent, node: Node<TaskNodeData>) => {
-      const overSidebar = isOverSidebar(event.clientX, event.clientY);
-
-      if (overSidebar) {
+    (_event: React.MouseEvent, node: Node<TaskNodeData>) => {
+      // Use the ref to get the current value (avoids stale closure issue)
+      if (isDraggingOverSidebarRef.current) {
         // Move task back to pool by clearing dag_position
         updateTask.mutate({
           taskId: node.id,
@@ -444,15 +450,15 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
             image_ids: null,
             dag_position_x: null,
             dag_position_y: null,
+            clear_dag_position: true,
           },
         });
       }
 
       // Reset drag state
       setIsDraggingOverSidebar(false);
-      setDraggingNodeId(null);
     },
-    [updateTask, isOverSidebar]
+    [updateTask]
   );
 
   return (

@@ -133,6 +133,9 @@ pub struct UpdateTask {
     pub image_ids: Option<Vec<Uuid>>,
     pub dag_position_x: Option<f64>,
     pub dag_position_y: Option<f64>,
+    /// Set to true to clear dag_position_x and dag_position_y (move task back to pool)
+    #[serde(default)]
+    pub clear_dag_position: bool,
 }
 
 impl Task {
