@@ -47,8 +47,10 @@ import TaskKanbanBoard, {
   type KanbanColumnItem,
 } from '@/components/tasks/TaskKanbanBoard';
 import { TaskTableView } from '@/components/tasks/TaskTableView';
+import { TaskDagView } from '@/components/tasks/TaskDagView';
 import { ViewSwitcher } from '@/components/tasks/ViewSwitcher';
 import { useTaskView } from '@/contexts/TaskViewContext';
+import { useTaskDependencies } from '@/hooks/useTaskDependencies';
 import { useTaskFilters } from '@/contexts/TaskFiltersContext';
 import type { DragEndEvent } from '@/components/ui/shadcn-io/kanban';
 import {
@@ -190,6 +192,8 @@ export function ProjectTasks() {
     isLoading,
     error: streamError,
   } = useProjectTasks(projectId || '');
+
+  const { dependencies } = useTaskDependencies(projectId);
 
   const selectedTask = useMemo(
     () => (taskId ? (tasksById[taskId] ?? null) : null),
@@ -997,6 +1001,13 @@ export function ProjectTasks() {
         selectedTaskId={selectedTask?.id}
         selectedSharedTaskId={selectedSharedTaskId}
         onCreateTask={handleCreateNewTask}
+      />
+    ) : viewMode === 'dag' ? (
+      <TaskDagView
+        tasks={tasks}
+        dependencies={dependencies}
+        onViewTaskDetails={handleViewTaskDetails}
+        selectedTaskId={selectedTask?.id}
       />
     ) : (
       <div className="w-full h-full overflow-x-auto overflow-y-auto overscroll-x-contain">

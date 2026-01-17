@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-export type TaskViewMode = 'kanban' | 'table';
+export type TaskViewMode = 'kanban' | 'table' | 'dag';
 
 const LOCAL_STORAGE_KEY = 'vibe-kanban-task-view-mode';
 
@@ -29,12 +29,12 @@ export function TaskViewProvider({ children }: TaskViewProviderProps) {
   // Initialize from URL param, then localStorage, then default to 'kanban'
   const [viewMode, setViewModeState] = useState<TaskViewMode>(() => {
     const urlParam = searchParams.get('taskView') as TaskViewMode;
-    if (urlParam === 'kanban' || urlParam === 'table') {
+    if (urlParam === 'kanban' || urlParam === 'table' || urlParam === 'dag') {
       return urlParam;
     }
 
     const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (stored === 'kanban' || stored === 'table') {
+    if (stored === 'kanban' || stored === 'table' || stored === 'dag') {
       return stored;
     }
 
@@ -44,7 +44,10 @@ export function TaskViewProvider({ children }: TaskViewProviderProps) {
   // Sync URL param when it changes externally
   useEffect(() => {
     const urlParam = searchParams.get('taskView') as TaskViewMode;
-    if (urlParam && (urlParam === 'kanban' || urlParam === 'table')) {
+    if (
+      urlParam &&
+      (urlParam === 'kanban' || urlParam === 'table' || urlParam === 'dag')
+    ) {
       if (urlParam !== viewMode) {
         setViewModeState(urlParam);
       }

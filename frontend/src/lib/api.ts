@@ -98,6 +98,8 @@ import {
   SyncResult,
   GitHubIssueMapping,
   TaskProperty,
+  TaskDependency,
+  DependencyCreator,
 } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { createWorkspaceWithSession } from '@/types/attempt';
@@ -1508,5 +1510,43 @@ export const githubApi = {
       `/api/projects/${projectId}/github-links/${linkId}/mappings`
     );
     return handleApiResponse<GitHubIssueMapping[]>(response);
+  },
+};
+
+// Task Dependencies API
+export const dependenciesApi = {
+  /** Get all dependencies for tasks in a project */
+  getByProject: async (projectId: string): Promise<TaskDependency[]> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/dependencies`
+    );
+    return handleApiResponse<TaskDependency[]>(response);
+  },
+
+  /** Create a new dependency between tasks */
+  create: async (
+    projectId: string,
+    data: {
+      task_id: string;
+      depends_on_task_id: string;
+      created_by?: DependencyCreator;
+    }
+  ): Promise<TaskDependency> => {
+    const response = await makeRequest(
+      `/api/projects/${projectId}/dependencies`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    return handleApiResponse<TaskDependency>(response);
+  },
+
+  /** Delete a dependency by ID */
+  delete: async (dependencyId: string): Promise<void> => {
+    const response = await makeRequest(`/api/dependencies/${dependencyId}`, {
+      method: 'DELETE',
+    });
+    return handleApiResponse<void>(response);
   },
 };
