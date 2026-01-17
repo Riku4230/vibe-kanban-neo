@@ -9,6 +9,7 @@ import {
   Check,
   GitBranch,
   Settings,
+  CheckCircle2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ViewProcessesDialog } from '@/components/dialogs/tasks/ViewProcessesDialog';
@@ -23,8 +24,8 @@ import { IdeIcon } from '@/components/ide/IdeIcon';
 import { useUserSystem } from '@/components/ConfigProvider';
 import { getIdeName } from '@/components/ide/IdeIcon';
 import { useProject } from '@/contexts/ProjectContext';
-import { useQuery } from '@tanstack/react-query';
-import { attemptsApi } from '@/lib/api';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { attemptsApi, tasksApi } from '@/lib/api';
 import {
   BaseAgentCapability,
   type BaseCodingAgent,
@@ -60,6 +61,7 @@ export function NextActionCard({
   const { config } = useUserSystem();
   const { projectId } = useProject();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
 
   const { data: attempt } = useQuery({
@@ -130,6 +132,20 @@ export function NextActionCard({
       task,
     });
   }, [attemptId, task]);
+
+  // Mark task as done mutation
+  const markAsDoneMutation = useMutation({
+    mutationFn: (taskId: string) => tasksApi.update(taskId, { status: 'done' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task', task?.id] });
+    },
+  });
+
+  const handleMarkAsDone = useCallback(() => {
+    if (!task?.id) return;
+    markAsDoneMutation.mutate(task.id);
+  }, [task?.id, markAsDoneMutation]);
 
   const handleRunSetup = useCallback(async () => {
     if (!attemptId || !attempt?.session?.executor) return;
@@ -370,6 +386,25 @@ export function NextActionCard({
                 </TooltipTrigger>
                 <TooltipContent>{t('attempt.gitActions')}</TooltipContent>
               </Tooltip>
+
+              {/* Mark as Done button */}
+              {task && task.status !== 'done' && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0"
+                      onClick={handleMarkAsDone}
+                      disabled={markAsDoneMutation.isPending}
+                      aria-label={t('attempt.markAsDone')}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('attempt.markAsDone')}</TooltipContent>
+                </Tooltip>
+              )}
             </div>
           )}
         </div>
