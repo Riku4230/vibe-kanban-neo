@@ -391,14 +391,80 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
     [createDependency, poolTasks, screenToFlowPosition, updateTask]
   );
 
+  // Ref for sidebar to detect drops on it
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  // State to track if dragging over sidebar
+  const [isDraggingOverSidebar, setIsDraggingOverSidebar] = useState(false);
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+
+  // Helper to check if mouse is over sidebar
+  const isOverSidebar = useCallback((clientX: number, clientY: number) => {
+    if (!sidebarRef.current) return false;
+    const rect = sidebarRef.current.getBoundingClientRect();
+    return (
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom
+    );
+  }, []);
+
+  // Handle node drag start
+  const handleNodeDragStart = useCallback(
+    (_event: React.MouseEvent, node: Node<TaskNodeData>) => {
+      setDraggingNodeId(node.id);
+    },
+    []
+  );
+
+  // Handle node drag - track position for visual feedback
+  const handleNodeDrag = useCallback(
+    (event: React.MouseEvent, _node: Node<TaskNodeData>) => {
+      const overSidebar = isOverSidebar(event.clientX, event.clientY);
+      setIsDraggingOverSidebar(overSidebar);
+    },
+    [isOverSidebar]
+  );
+
+  // Handle node drag stop - check if dropped on sidebar to move back to pool
+  const handleNodeDragStop = useCallback(
+    (event: React.MouseEvent, node: Node<TaskNodeData>) => {
+      const overSidebar = isOverSidebar(event.clientX, event.clientY);
+
+      if (overSidebar) {
+        // Move task back to pool by clearing dag_position
+        updateTask.mutate({
+          taskId: node.id,
+          data: {
+            title: null,
+            description: null,
+            status: null,
+            parent_workspace_id: null,
+            image_ids: null,
+            dag_position_x: null,
+            dag_position_y: null,
+          },
+        });
+      }
+
+      // Reset drag state
+      setIsDraggingOverSidebar(false);
+      setDraggingNodeId(null);
+    },
+    [updateTask, isOverSidebar]
+  );
+
   return (
     <>
       <div className="flex w-full h-full min-h-[500px]">
         {/* Sidebar with isolated tasks */}
-      <TaskDagSidebar
-        poolTasks={poolTasks}
-        onViewDetails={onViewDetails}
-      />
+        <TaskDagSidebar
+          ref={sidebarRef}
+          poolTasks={poolTasks}
+          onViewDetails={onViewDetails}
+          isDropTarget={isDraggingOverSidebar}
+        />
 
       {/* Main DAG area */}
       <div className="flex-1 h-full">
@@ -408,6 +474,9 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodeDragStart={handleNodeDragStart}
+          onNodeDrag={handleNodeDrag}
+          onNodeDragStop={handleNodeDragStop}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
           nodeTypes={nodeTypes}

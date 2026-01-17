@@ -1,8 +1,9 @@
-import { memo, type DragEvent } from 'react';
+import { memo, forwardRef, type DragEvent } from 'react';
 import {
   Circle,
   CheckCircle2,
   MoreHorizontal,
+  Inbox,
 } from 'lucide-react';
 import type { TaskWithAttemptStatus } from 'shared/types';
 import { cn } from '@/lib/utils';
@@ -94,26 +95,43 @@ export interface TaskDagSidebarProps {
   /** Tasks in the pool (not placed in DAG yet) */
   poolTasks: TaskWithAttemptStatus[];
   onViewDetails: (task: TaskWithAttemptStatus) => void;
+  /** Whether a DAG node is being dragged over this sidebar */
+  isDropTarget?: boolean;
 }
 
-export const TaskDagSidebar = memo(function TaskDagSidebar({
-  poolTasks,
-  onViewDetails,
-}: TaskDagSidebarProps) {
-  // Sort: Todo first, then Done
-  const sortedTasks = [...poolTasks].sort((a, b) => {
-    if (a.status === 'done' && b.status !== 'done') return 1;
-    if (a.status !== 'done' && b.status === 'done') return -1;
-    // Within same status, sort by created_at (newest first)
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
+export const TaskDagSidebar = memo(forwardRef<HTMLDivElement, TaskDagSidebarProps>(
+  function TaskDagSidebar({ poolTasks, onViewDetails, isDropTarget = false }, ref) {
+    // Sort: Todo first, then Done
+    const sortedTasks = [...poolTasks].sort((a, b) => {
+      if (a.status === 'done' && b.status !== 'done') return 1;
+      if (a.status !== 'done' && b.status === 'done') return -1;
+      // Within same status, sort by created_at (newest first)
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
-  const todoCount = poolTasks.filter(t => t.status !== 'done').length;
-  const doneCount = poolTasks.filter(t => t.status === 'done').length;
+    const todoCount = poolTasks.filter(t => t.status !== 'done').length;
+    const doneCount = poolTasks.filter(t => t.status === 'done').length;
 
-  return (
-    <div className="w-72 h-full bg-muted/30 border-r border-border flex flex-col shrink-0">
-      {/* Header */}
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          "w-72 h-full bg-muted/30 border-r border-border flex flex-col shrink-0 relative transition-colors duration-200",
+          isDropTarget && "bg-slate-200/80 dark:bg-slate-700/80 border-primary"
+        )}
+      >
+        {/* Drop zone overlay */}
+        {isDropTarget && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-slate-100/90 dark:bg-slate-800/90 backdrop-blur-sm border-2 border-dashed border-primary rounded-lg m-2">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+              <Inbox className="w-8 h-8 text-primary" />
+            </div>
+            <p className="text-sm font-medium text-primary">ここにドロップ</p>
+            <p className="text-xs text-muted-foreground mt-1">タスクプールに戻す</p>
+          </div>
+        )}
+
+        {/* Header */}
       <div className="p-4 border-b border-border bg-card">
         <h3 className="text-sm font-semibold text-foreground">タスクプール</h3>
         <p className="text-xs text-muted-foreground mt-1">
@@ -161,5 +179,6 @@ export const TaskDagSidebar = memo(function TaskDagSidebar({
         </p>
       </div>
     </div>
-  );
-});
+    );
+  }
+));
