@@ -5,6 +5,7 @@ use db::models::{
     repo::Repo,
     tag::Tag,
     task::{CreateTask, Task, TaskStatus, TaskWithAttemptStatus, UpdateTask},
+    task_dependency::{CreateTaskDependency, DependencyCreator, TaskDependency},
     workspace::{Workspace, WorkspaceContext},
 };
 use executors::{executors::BaseCodingAgent, profile::ExecutorProfileId};
@@ -249,6 +250,73 @@ pub struct GetTaskRequest {
 #[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct GetTaskResponse {
     pub task: TaskDetails,
+}
+
+// ===== Dependency Types =====
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct ListDependenciesRequest {
+    #[schemars(description = "The ID of the project to list dependencies from")]
+    pub project_id: Uuid,
+}
+
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct DependencySummary {
+    #[schemars(description = "The unique identifier of the dependency")]
+    pub id: String,
+    #[schemars(description = "The task that depends on another")]
+    pub task_id: String,
+    #[schemars(description = "The task being depended on")]
+    pub depends_on_task_id: String,
+    #[schemars(description = "When the dependency was created")]
+    pub created_at: String,
+    #[schemars(description = "Who created the dependency: 'user' or 'ai'")]
+    pub created_by: String,
+}
+
+impl DependencySummary {
+    fn from_dependency(dep: TaskDependency) -> Self {
+        Self {
+            id: dep.id.to_string(),
+            task_id: dep.task_id.to_string(),
+            depends_on_task_id: dep.depends_on_task_id.to_string(),
+            created_at: dep.created_at.to_rfc3339(),
+            created_by: dep.created_by.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct ListDependenciesResponse {
+    pub dependencies: Vec<DependencySummary>,
+    pub count: usize,
+    pub project_id: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct AddDependencyRequest {
+    #[schemars(description = "The ID of the project containing the tasks")]
+    pub project_id: Uuid,
+    #[schemars(description = "The ID of the task that will depend on another")]
+    pub task_id: Uuid,
+    #[schemars(description = "The ID of the task to depend on (the prerequisite)")]
+    pub depends_on_task_id: Uuid,
+}
+
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct AddDependencyResponse {
+    pub dependency: DependencySummary,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct RemoveDependencyRequest {
+    #[schemars(description = "The ID of the dependency to remove")]
+    pub dependency_id: Uuid,
+}
+
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct RemoveDependencyResponse {
+    pub deleted_dependency_id: String,
 }
 
 #[derive(Debug, Clone)]
@@ -836,12 +904,95 @@ impl TaskServer {
 
         TaskServer::success(&response)
     }
+
+    // ===== Dependency Tools =====
+
+    #[tool(
+        description = "List all dependencies between tasks in a project. Returns which tasks depend on which other tasks. `project_id` is required."
+    )]
+    async fn list_dependencies(
+        &self,
+        Parameters(ListDependenciesRequest { project_id }): Parameters<ListDependenciesRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let url = self.url(&format!("/api/projects/{}/dependencies", project_id));
+        let dependencies: Vec<TaskDependency> = match self.send_json(self.client.get(&url)).await {
+            Ok(deps) => deps,
+            Err(e) => return Ok(e),
+        };
+
+        let dependency_summaries: Vec<DependencySummary> = dependencies
+            .into_iter()
+            .map(DependencySummary::from_dependency)
+            .collect();
+
+        let response = ListDependenciesResponse {
+            count: dependency_summaries.len(),
+            dependencies: dependency_summaries,
+            project_id: project_id.to_string(),
+        };
+
+        TaskServer::success(&response)
+    }
+
+    #[tool(
+        description = "Add a dependency between two tasks. The task specified by `task_id` will depend on `depends_on_task_id` (i.e., the depends_on task must be completed first). Both tasks must be in the same project. `project_id`, `task_id`, and `depends_on_task_id` are required."
+    )]
+    async fn add_dependency(
+        &self,
+        Parameters(AddDependencyRequest {
+            project_id,
+            task_id,
+            depends_on_task_id,
+        }): Parameters<AddDependencyRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let url = self.url(&format!("/api/projects/{}/dependencies", project_id));
+
+        let payload = CreateTaskDependency {
+            task_id,
+            depends_on_task_id,
+            created_by: Some(DependencyCreator::Ai),
+        };
+
+        let dependency: TaskDependency = match self
+            .send_json(self.client.post(&url).json(&payload))
+            .await
+        {
+            Ok(dep) => dep,
+            Err(e) => return Ok(e),
+        };
+
+        let response = AddDependencyResponse {
+            dependency: DependencySummary::from_dependency(dependency),
+        };
+
+        TaskServer::success(&response)
+    }
+
+    #[tool(
+        description = "Remove a dependency between tasks. Use `list_dependencies` to find the `dependency_id`. `dependency_id` is required."
+    )]
+    async fn remove_dependency(
+        &self,
+        Parameters(RemoveDependencyRequest { dependency_id }): Parameters<RemoveDependencyRequest>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let url = self.url(&format!("/api/dependencies/{}", dependency_id));
+
+        if let Err(e) = self.send_empty_json(self.client.delete(&url)).await {
+            return Ok(e);
+        }
+
+        let response = RemoveDependencyResponse {
+            deleted_dependency_id: dependency_id.to_string(),
+        };
+
+        TaskServer::success(&response)
+    }
 }
 
 #[tool_handler]
 impl ServerHandler for TaskServer {
     fn get_info(&self) -> ServerInfo {
-        let mut instruction = "A task and project management server. If you need to create or update tickets or tasks then use these tools. Most of them absolutely require that you pass the `project_id` of the project that you are currently working on. You can get project ids by using `list projects`. Call `list_tasks` to fetch the `task_ids` of all the tasks in a project`.. TOOLS: 'list_projects', 'list_tasks', 'create_task', 'start_workspace_session', 'get_task', 'update_task', 'delete_task', 'list_repos'. Make sure to pass `project_id` or `task_id` where required. You can use list tools to get the available ids.".to_string();
+        let mut instruction = "A task and project management server. If you need to create or update tickets or tasks then use these tools. Most of them absolutely require that you pass the `project_id` of the project that you are currently working on. You can get project ids by using `list projects`. Call `list_tasks` to fetch the `task_ids` of all the tasks in a project`.. TOOLS: 'list_projects', 'list_tasks', 'create_task', 'start_workspace_session', 'get_task', 'update_task', 'delete_task', 'list_repos', 'list_dependencies', 'add_dependency', 'remove_dependency'. Make sure to pass `project_id` or `task_id` where required. You can use list tools to get the available ids.".to_string();
         if self.context.is_some() {
             let context_instruction = "Use 'get_context' to fetch project/task/workspace metadata for the active Crew workspace session when available.";
             instruction = format!("{} {}", context_instruction, instruction);

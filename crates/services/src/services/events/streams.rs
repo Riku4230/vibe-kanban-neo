@@ -3,6 +3,7 @@ use db::models::{
     project::Project,
     scratch::Scratch,
     task::{Task, TaskWithAttemptStatus},
+    task_dependency::TaskDependency,
     workspace::Workspace,
 };
 use futures::StreamExt;
@@ -521,5 +522,84 @@ impl EventService {
 
         let initial_stream = futures::stream::iter(vec![Ok(initial_msg), Ok(LogMsg::Ready)]);
         Ok(initial_stream.chain(filtered_stream).boxed())
+    }
+
+    /// Stream raw dependency messages for a specific project with initial snapshot
+    pub async fn stream_dependencies_raw(
+        &self,
+        project_id: Uuid,
+    ) -> Result<futures::stream::BoxStream<'static, Result<LogMsg, std::io::Error>>, EventError>
+    {
+        // Get initial snapshot of dependencies
+        let dependencies =
+            TaskDependency::find_by_project_id(&self.db.pool, project_id).await?;
+
+        // Convert dependency array to object keyed by dependency ID
+        let dependencies_map: serde_json::Map<String, serde_json::Value> = dependencies
+            .into_iter()
+            .map(|dep| (dep.id.to_string(), serde_json::to_value(dep).unwrap()))
+            .collect();
+
+        let initial_patch = json!([
+            {
+                "op": "replace",
+                "path": "/dependencies",
+                "value": dependencies_map
+            }
+        ]);
+        let initial_msg = LogMsg::JsonPatch(serde_json::from_value(initial_patch).unwrap());
+
+        // Clone necessary data for the async filter
+        let db_pool = self.db.pool.clone();
+
+        // Get filtered event stream
+        let filtered_stream =
+            BroadcastStream::new(self.msg_store.get_receiver()).filter_map(move |msg_result| {
+                let db_pool = db_pool.clone();
+                async move {
+                    match msg_result {
+                        Ok(LogMsg::JsonPatch(patch)) => {
+                            // Filter events based on project_id
+                            if let Some(patch_op) = patch.0.first() {
+                                // Check if this is a dependency patch
+                                if patch_op.path().starts_with("/dependencies/") {
+                                    match patch_op {
+                                        json_patch::PatchOperation::Add(op) => {
+                                            // Parse dependency data directly from value
+                                            if let Ok(dep) =
+                                                serde_json::from_value::<TaskDependency>(
+                                                    op.value.clone(),
+                                                )
+                                            {
+                                                // Check if the dependency belongs to a task in this project
+                                                if let Ok(Some(task)) =
+                                                    Task::find_by_id(&db_pool, dep.task_id).await
+                                                    && task.project_id == project_id
+                                                {
+                                                    return Some(Ok(LogMsg::JsonPatch(patch)));
+                                                }
+                                            }
+                                        }
+                                        json_patch::PatchOperation::Remove(_) => {
+                                            // For remove operations, we allow all and let client handle filtering
+                                            return Some(Ok(LogMsg::JsonPatch(patch)));
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            None
+                        }
+                        Ok(other) => Some(Ok(other)), // Pass through non-patch messages
+                        Err(_) => None,               // Filter out broadcast errors
+                    }
+                }
+            });
+
+        // Start with initial snapshot, Ready signal, then live updates
+        let initial_stream = futures::stream::iter(vec![Ok(initial_msg), Ok(LogMsg::Ready)]);
+        let combined_stream = initial_stream.chain(filtered_stream).boxed();
+
+        Ok(combined_stream)
     }
 }

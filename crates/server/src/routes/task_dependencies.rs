@@ -1,10 +1,14 @@
 use axum::{
     Extension, Json, Router,
-    extract::{Path, State},
+    extract::{
+        Path, State,
+        ws::{WebSocket, WebSocketUpgrade},
+    },
     middleware::from_fn_with_state,
-    response::Json as ResponseJson,
+    response::{IntoResponse, Json as ResponseJson},
     routing::{delete, get, put},
 };
+use futures_util::{SinkExt, StreamExt, TryStreamExt};
 use db::models::{
     project::Project,
     task::Task,
@@ -40,6 +44,54 @@ pub async fn get_project_dependencies(
     let dependencies =
         TaskDependency::find_by_project_id(&deployment.db().pool, project.id).await?;
     Ok(ResponseJson(ApiResponse::success(dependencies)))
+}
+
+/// WebSocket endpoint for streaming dependency updates
+pub async fn stream_dependencies_ws(
+    ws: WebSocketUpgrade,
+    Extension(project): Extension<Project>,
+    State(deployment): State<DeploymentImpl>,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| async move {
+        if let Err(e) = handle_dependencies_ws(socket, deployment, project.id).await {
+            tracing::warn!("dependencies WS closed: {}", e);
+        }
+    })
+}
+
+async fn handle_dependencies_ws(
+    socket: WebSocket,
+    deployment: DeploymentImpl,
+    project_id: uuid::Uuid,
+) -> anyhow::Result<()> {
+    // Get the raw stream and convert LogMsg to WebSocket messages
+    let mut stream = deployment
+        .events()
+        .stream_dependencies_raw(project_id)
+        .await?
+        .map_ok(|msg| msg.to_ws_message_unchecked());
+
+    // Split socket into sender and receiver
+    let (mut sender, mut receiver) = socket.split();
+
+    // Drain (and ignore) any client->server messages so pings/pongs work
+    tokio::spawn(async move { while let Some(Ok(_)) = receiver.next().await {} });
+
+    // Forward server messages
+    while let Some(item) = stream.next().await {
+        match item {
+            Ok(msg) => {
+                if sender.send(msg).await.is_err() {
+                    break; // client disconnected
+                }
+            }
+            Err(e) => {
+                tracing::error!("dependencies stream error: {}", e);
+                break;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Create a new dependency between tasks
@@ -190,19 +242,21 @@ pub async fn update_task_position(
 pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     // プロジェクト内の依存関係操作（project_idが必要）
     let project_dependencies_router = Router::new()
-        .route("/dependencies", get(get_project_dependencies).post(create_dependency))
+        .route(
+            "/dependencies",
+            get(get_project_dependencies).post(create_dependency),
+        )
+        .route("/dependencies/stream/ws", get(stream_dependencies_ws))
         .layer(from_fn_with_state(
             deployment.clone(),
             load_project_middleware,
         ));
 
     // 依存関係の直接操作（dependency_idのみ）
-    let dependencies_router = Router::new()
-        .route("/{dependency_id}", delete(delete_dependency));
+    let dependencies_router = Router::new().route("/{dependency_id}", delete(delete_dependency));
 
     // タスク位置の更新
-    let task_position_router = Router::new()
-        .route("/{task_id}/position", put(update_task_position));
+    let task_position_router = Router::new().route("/{task_id}/position", put(update_task_position));
 
     Router::new()
         .nest("/projects/{id}", project_dependencies_router)

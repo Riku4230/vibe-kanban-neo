@@ -4,7 +4,7 @@ use db::{
     DBService,
     models::{
         execution_process::ExecutionProcess, project::Project, scratch::Scratch, session::Session,
-        task::Task, workspace::Workspace,
+        task::Task, task_dependency::TaskDependency, workspace::Workspace,
     },
 };
 use serde_json::json;
@@ -21,7 +21,8 @@ mod streams;
 pub mod types;
 
 pub use patches::{
-    execution_process_patch, project_patch, scratch_patch, task_patch, workspace_patch,
+    dependency_patch, execution_process_patch, project_patch, scratch_patch, task_patch,
+    workspace_patch,
 };
 pub use types::{EventError, EventPatch, EventPatchInner, HookTables, RecordTypes};
 
@@ -162,6 +163,15 @@ impl EventService {
                                     msg_store_for_preupdate.push_patch(patch);
                                 }
                             }
+                            "task_dependencies" => {
+                                if let Ok(value) = preupdate.get_old_column_value(0)
+                                    && let Ok(dependency_id) =
+                                        <Uuid as Decode<Sqlite>>::decode(value)
+                                {
+                                    let patch = dependency_patch::remove(dependency_id);
+                                    msg_store_for_preupdate.push_patch(patch);
+                                }
+                            }
                             _ => {}
                         }
                     }
@@ -181,7 +191,8 @@ impl EventService {
                                 | (HookTables::Projects, SqliteOperation::Delete)
                                 | (HookTables::Workspaces, SqliteOperation::Delete)
                                 | (HookTables::ExecutionProcesses, SqliteOperation::Delete)
-                                | (HookTables::Scratch, SqliteOperation::Delete) => {
+                                | (HookTables::Scratch, SqliteOperation::Delete)
+                                | (HookTables::TaskDependencies, SqliteOperation::Delete) => {
                                     // Deletions handled in preupdate hook for reliable data capture
                                     return;
                                 }
@@ -259,6 +270,24 @@ impl EventService {
                                         }
                                     }
                                 }
+                                (HookTables::TaskDependencies, _) => {
+                                    match TaskDependency::find_by_rowid(&db.pool, rowid).await {
+                                        Ok(Some(dependency)) => {
+                                            RecordTypes::TaskDependency(dependency)
+                                        }
+                                        Ok(None) => RecordTypes::DeletedTaskDependency {
+                                            rowid,
+                                            dependency_id: None,
+                                        },
+                                        Err(e) => {
+                                            tracing::error!(
+                                                "Failed to fetch task_dependency: {:?}",
+                                                e
+                                            );
+                                            return;
+                                        }
+                                    }
+                                }
                             };
 
                             let db_op: &str = match hook.operation {
@@ -326,6 +355,23 @@ impl EventService {
                                     ..
                                 } => {
                                     let patch = scratch_patch::remove(*scratch_id, scratch_type_str);
+                                    msg_store_for_hook.push_patch(patch);
+                                    return;
+                                }
+                                RecordTypes::TaskDependency(dependency) => {
+                                    let patch = match hook.operation {
+                                        SqliteOperation::Insert => dependency_patch::add(dependency),
+                                        SqliteOperation::Update => dependency_patch::add(dependency), // Dependencies are not updated, only created/deleted
+                                        _ => dependency_patch::add(dependency),
+                                    };
+                                    msg_store_for_hook.push_patch(patch);
+                                    return;
+                                }
+                                RecordTypes::DeletedTaskDependency {
+                                    dependency_id: Some(dependency_id),
+                                    ..
+                                } => {
+                                    let patch = dependency_patch::remove(*dependency_id);
                                     msg_store_for_hook.push_patch(patch);
                                     return;
                                 }

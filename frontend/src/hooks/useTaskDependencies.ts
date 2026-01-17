@@ -1,4 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { useJsonPatchWsStream } from './useJsonPatchWsStream';
 import { dependenciesApi, ApiError } from '@/lib/api';
 import type { TaskDependency } from 'shared/types';
 
@@ -8,66 +10,83 @@ export const dependencyKeys = {
     [...dependencyKeys.all, 'project', projectId] as const,
 };
 
+type DependenciesState = {
+  dependencies: Record<string, TaskDependency>;
+};
+
 export function useTaskDependencies(projectId: string | undefined) {
-  const queryClient = useQueryClient();
+  const endpoint = projectId
+    ? `/api/projects/${encodeURIComponent(projectId)}/dependencies/stream/ws`
+    : undefined;
 
-  const query = useQuery({
-    queryKey: dependencyKeys.byProject(projectId || ''),
-    queryFn: () => dependenciesApi.getByProject(projectId!),
-    enabled: !!projectId,
-  });
+  const initialData = useCallback(
+    (): DependenciesState => ({ dependencies: {} }),
+    []
+  );
 
-  const invalidateDependencies = () => {
-    if (projectId) {
-      queryClient.invalidateQueries({
-        queryKey: dependencyKeys.byProject(projectId),
-      });
-    }
-  };
+  const { data, isConnected, isInitialized, error } = useJsonPatchWsStream(
+    endpoint,
+    !!projectId,
+    initialData
+  );
+
+  // Convert the record to an array
+  const dependencies = useMemo(() => {
+    if (!data?.dependencies) return [];
+    return Object.values(data.dependencies).sort(
+      (a, b) =>
+        new Date(b.created_at as string).getTime() -
+        new Date(a.created_at as string).getTime()
+    );
+  }, [data?.dependencies]);
+
+  const dependenciesById = useMemo(
+    () => data?.dependencies ?? {},
+    [data?.dependencies]
+  );
 
   const createDependency = useMutation({
-    mutationFn: (data: { task_id: string; depends_on_task_id: string }) =>
-      dependenciesApi.create(projectId!, data),
-    onSuccess: () => {
-      invalidateDependencies();
-    },
-    onError: (error: ApiError) => {
-      // Handle specific error cases
-      if (error.status === 409) {
-        // Conflict - circular dependency or already exists
+    mutationFn: (input: { task_id: string; depends_on_task_id: string }) =>
+      dependenciesApi.create(projectId!, input),
+    // No need for onSuccess - WebSocket will handle the update
+    onError: (err: ApiError) => {
+      if (err.status === 409) {
         console.error(
           'Cannot create dependency: This would create a circular dependency or the dependency already exists.',
-          error
+          err
         );
         window.alert(
           'Cannot create dependency: This would create a circular dependency or the dependency already exists.'
         );
       } else {
-        console.error('Failed to create dependency:', error.message);
-        window.alert(`Failed to create dependency: ${error.message}`);
+        console.error('Failed to create dependency:', err.message);
+        window.alert(`Failed to create dependency: ${err.message}`);
       }
     },
   });
 
   const deleteDependency = useMutation({
     mutationFn: (dependencyId: string) => dependenciesApi.delete(dependencyId),
-    onSuccess: () => {
-      invalidateDependencies();
-    },
-    onError: (error: ApiError) => {
-      console.error('Failed to delete dependency:', error.message);
-      window.alert(`Failed to delete dependency: ${error.message}`);
+    // No need for onSuccess - WebSocket will handle the update
+    onError: (err: ApiError) => {
+      console.error('Failed to delete dependency:', err.message);
+      window.alert(`Failed to delete dependency: ${err.message}`);
     },
   });
 
+  const isLoading = !isInitialized && !error;
+
   return {
-    dependencies: query.data ?? [],
-    isLoading: query.isLoading,
-    error: query.error,
-    refetch: query.refetch,
+    dependencies,
+    dependenciesById,
+    isLoading,
+    isConnected,
+    error,
     createDependency,
     deleteDependency,
-    invalidateDependencies,
+    // Keep for backward compatibility, but no longer needed
+    invalidateDependencies: () => {},
+    refetch: () => Promise.resolve(),
   };
 }
 

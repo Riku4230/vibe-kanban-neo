@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 interface TaskDAGEdgeProps extends EdgeProps {
   data?: {
     onDelete?: (edgeId: string) => void;
+    animated?: boolean;
   };
 }
 
@@ -27,6 +28,13 @@ export const TaskDAGEdge = memo(function TaskDAGEdge({
   data,
 }: TaskDAGEdgeProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isNew, setIsNew] = useState(true);
+
+  // Remove "new" animation state after initial render
+  useEffect(() => {
+    const timer = setTimeout(() => setIsNew(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -44,6 +52,11 @@ export const TaskDAGEdge = memo(function TaskDAGEdge({
     }
   };
 
+  // Calculate path length for dash animation
+  const pathLength = Math.sqrt(
+    Math.pow(targetX - sourceX, 2) + Math.pow(targetY - sourceY, 2)
+  );
+
   return (
     <>
       <BaseEdge
@@ -51,8 +64,16 @@ export const TaskDAGEdge = memo(function TaskDAGEdge({
         markerEnd={markerEnd}
         style={{
           ...style,
-          stroke: isHovered ? 'hsl(var(--destructive))' : 'hsl(var(--muted-foreground))',
+          stroke: isHovered
+            ? 'hsl(var(--destructive))'
+            : isNew
+              ? 'hsl(var(--primary))'
+              : 'hsl(var(--muted-foreground))',
           strokeWidth: isHovered ? 2 : 1.5,
+          strokeDasharray: isNew ? pathLength : 'none',
+          strokeDashoffset: isNew ? pathLength : 0,
+          animation: isNew ? 'edge-draw 0.5s ease-out forwards' : 'none',
+          transition: 'stroke 0.2s ease',
         }}
         interactionWidth={20}
         onMouseEnter={() => setIsHovered(true)}
@@ -83,6 +104,19 @@ export const TaskDAGEdge = memo(function TaskDAGEdge({
           </div>
         </EdgeLabelRenderer>
       )}
+      {/* CSS keyframes for edge animation */}
+      <style>
+        {`
+          @keyframes edge-draw {
+            from {
+              stroke-dashoffset: ${pathLength};
+            }
+            to {
+              stroke-dashoffset: 0;
+            }
+          }
+        `}
+      </style>
     </>
   );
 });

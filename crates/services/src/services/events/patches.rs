@@ -1,6 +1,6 @@
 use db::models::{
     execution_process::ExecutionProcess, project::Project, scratch::Scratch,
-    task::TaskWithAttemptStatus, workspace::WorkspaceWithStatus,
+    task::TaskWithAttemptStatus, task_dependency::TaskDependency, workspace::WorkspaceWithStatus,
 };
 use json_patch::{AddOperation, Patch, PatchOperation, RemoveOperation, ReplaceOperation};
 use uuid::Uuid;
@@ -211,6 +211,38 @@ pub mod scratch_patch {
                 "payload": { "type": scratch_type_str },
                 "deleted": true
             }),
+        })])
+    }
+}
+
+/// Helper functions for creating task dependency-specific patches
+pub mod dependency_patch {
+    use super::*;
+
+    fn dependency_path(dependency_id: Uuid) -> String {
+        format!(
+            "/dependencies/{}",
+            escape_pointer_segment(&dependency_id.to_string())
+        )
+    }
+
+    /// Create patch for adding a new dependency
+    pub fn add(dependency: &TaskDependency) -> Patch {
+        Patch(vec![PatchOperation::Add(AddOperation {
+            path: dependency_path(dependency.id)
+                .try_into()
+                .expect("Dependency path should be valid"),
+            value: serde_json::to_value(dependency)
+                .expect("Dependency serialization should not fail"),
+        })])
+    }
+
+    /// Create patch for removing a dependency
+    pub fn remove(dependency_id: Uuid) -> Patch {
+        Patch(vec![PatchOperation::Remove(RemoveOperation {
+            path: dependency_path(dependency_id)
+                .try_into()
+                .expect("Dependency path should be valid"),
         })])
     }
 }

@@ -53,6 +53,24 @@ impl TaskDependency {
         .await
     }
 
+    /// Find a dependency by its rowid (used for SQLite update hooks)
+    pub async fn find_by_rowid(pool: &SqlitePool, rowid: i64) -> Result<Option<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            TaskDependency,
+            r#"SELECT
+                id as "id!: Uuid",
+                task_id as "task_id!: Uuid",
+                depends_on_task_id as "depends_on_task_id!: Uuid",
+                created_at as "created_at!: DateTime<Utc>",
+                created_by as "created_by!: DependencyCreator"
+            FROM task_dependencies
+            WHERE rowid = $1"#,
+            rowid
+        )
+        .fetch_optional(pool)
+        .await
+    }
+
     /// Find all dependencies for a given task (tasks that this task depends on)
     pub async fn find_by_task_id(
         pool: &SqlitePool,
