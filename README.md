@@ -1,11 +1,7 @@
 <p align="center">
-  <h1 align="center">🚀 Crew</h1>
+  <h1 align="center">Crew</h1>
   <p align="center"><strong>AI-powered task management for everyone</strong></p>
   <p align="center">Engineers, PMs, and Business teams - all working together with AI agents</p>
-</p>
-
-<p align="center">
-  <a href="#installation"><img alt="Get Started" src="https://img.shields.io/badge/Get%20Started-npx%20crew-blue?style=flat-square" /></a>
 </p>
 
 ## Overview
@@ -20,41 +16,6 @@ Crew is a modern task management tool that brings AI coding agents to everyone o
 
 ## Installation
 
-```bash
-npx crew
-```
-
-That's it! Crew will launch in your browser automatically.
-
-## Features
-
-### 🗂️ Project Management
-- Add git repositories as projects
-- Automatic git integration and validation
-- Project-wide file search
-
-### 📋 Task Management
-- Kanban-style task boards
-- Task status tracking (Todo, In Progress, Done)
-- Rich task descriptions
-
-### 🤖 AI Agent Integration
-- Support for Claude Code, Gemini CLI, Codex, Amp, and more
-- Create tasks and immediately start agent execution
-- Follow-up task execution for iterative development
-
-### ⚡ Development Workflow
-- Isolated git worktrees for each task
-- View diffs of changes made by agents
-- Merge successful changes back to main branch
-
-### 🎛️ Developer Tools
-- Open tasks in your preferred editor (VS Code, Cursor, Windsurf, etc.)
-- Real-time execution monitoring
-- Sound notifications for task completion
-
-## Development
-
 ### Prerequisites
 
 - [Rust](https://rustup.rs/) (latest stable)
@@ -64,6 +25,10 @@ That's it! Crew will launch in your browser automatically.
 ### Setup
 
 ```bash
+# Clone the repository
+git clone https://github.com/anthropics/crew.git
+cd crew
+
 # Install dependencies
 pnpm i
 
@@ -71,12 +36,34 @@ pnpm i
 pnpm run dev
 ```
 
-### Building from source
+Crew will launch in your browser automatically at `http://localhost:3000`.
 
-```bash
-./local-build.sh
-cd npx-cli && node bin/cli.js
-```
+## Features
+
+### Project Management
+- Add git repositories as projects
+- Automatic git integration and validation
+- Project-wide file search
+
+### Task Management
+- Kanban-style task boards
+- Task status tracking (Todo, In Progress, Done)
+- Rich task descriptions
+
+### AI Agent Integration
+- Support for Claude Code, Gemini CLI, Codex, Amp, and more
+- Create tasks and immediately start agent execution
+- Follow-up task execution for iterative development
+
+### Development Workflow
+- Isolated git worktrees for each task
+- View diffs of changes made by agents
+- Merge successful changes back to main branch
+
+### Developer Tools
+- Open tasks in your preferred editor (VS Code, Cursor, Windsurf, etc.)
+- Real-time execution monitoring
+- Sound notifications for task completion
 
 ## Architecture
 
@@ -86,6 +73,31 @@ cd npx-cli && node bin/cli.js
 | Frontend | React + TypeScript + Vite + Tailwind |
 | Database | SQLite (SQLx) |
 | Shared Types | ts-rs (auto-generated) |
+
+## Development Commands
+
+```bash
+# Install dependencies
+pnpm i
+
+# Run development server (frontend + backend)
+pnpm run dev
+
+# Run QA mode (recommended for testing)
+pnpm run dev:qa
+
+# Type check
+pnpm run check
+
+# Lint
+pnpm run lint
+
+# Run backend tests
+cargo test --workspace
+
+# Generate TypeScript types from Rust
+pnpm run generate-types
+```
 
 ## Contributing
 
