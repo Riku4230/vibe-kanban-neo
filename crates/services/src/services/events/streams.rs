@@ -75,9 +75,20 @@ impl EventService {
                                                 serde_json::from_value::<TaskWithAttemptStatus>(
                                                     op.value.clone(),
                                                 )
-                                                && task.project_id == project_id
                                             {
-                                                return Some(Ok(LogMsg::JsonPatch(patch)));
+                                                tracing::debug!(
+                                                    task_id = %task.id,
+                                                    dag_x = ?task.dag_position_x,
+                                                    dag_y = ?task.dag_position_y,
+                                                    "Task stream: received replace operation"
+                                                );
+                                                if task.project_id == project_id {
+                                                    tracing::debug!(
+                                                        task_id = %task.id,
+                                                        "Task stream: forwarding to client"
+                                                    );
+                                                    return Some(Ok(LogMsg::JsonPatch(patch)));
+                                                }
                                             }
                                         }
                                         json_patch::PatchOperation::Remove(_) => {
@@ -571,11 +582,20 @@ impl EventService {
                                                     op.value.clone(),
                                                 )
                                             {
+                                                tracing::debug!(
+                                                    dependency_id = %dep.id,
+                                                    task_id = %dep.task_id,
+                                                    "Dependency stream: received add operation"
+                                                );
                                                 // Check if the dependency belongs to a task in this project
                                                 if let Ok(Some(task)) =
                                                     Task::find_by_id(&db_pool, dep.task_id).await
                                                     && task.project_id == project_id
                                                 {
+                                                    tracing::debug!(
+                                                        dependency_id = %dep.id,
+                                                        "Dependency stream: forwarding to client"
+                                                    );
                                                     return Some(Ok(LogMsg::JsonPatch(patch)));
                                                 }
                                             }

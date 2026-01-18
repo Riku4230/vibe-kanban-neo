@@ -300,6 +300,13 @@ impl EventService {
                             // Handle task-related operations with direct patches
                             match &record_type {
                                 RecordTypes::Task(task) => {
+                                    tracing::debug!(
+                                        task_id = %task.id,
+                                        op = db_op,
+                                        dag_x = ?task.dag_position_x,
+                                        dag_y = ?task.dag_position_y,
+                                        "Task hook fired"
+                                    );
                                     // Convert Task to TaskWithAttemptStatus
                                     if let Ok(task_list) =
                                         Task::find_by_project_id_with_attempt_status(
@@ -319,6 +326,10 @@ impl EventService {
                                             }
                                             _ => task_patch::replace(&task_with_status), // fallback
                                         };
+                                        tracing::debug!(
+                                            task_id = %task_with_status.id,
+                                            "Pushing task patch to msg_store"
+                                        );
                                         msg_store_for_hook.push_patch(patch);
                                         return;
                                     }
@@ -359,11 +370,22 @@ impl EventService {
                                     return;
                                 }
                                 RecordTypes::TaskDependency(dependency) => {
+                                    tracing::debug!(
+                                        dependency_id = %dependency.id,
+                                        task_id = %dependency.task_id,
+                                        depends_on = %dependency.depends_on_task_id,
+                                        op = db_op,
+                                        "Dependency hook fired"
+                                    );
                                     let patch = match hook.operation {
                                         SqliteOperation::Insert => dependency_patch::add(dependency),
                                         SqliteOperation::Update => dependency_patch::add(dependency), // Dependencies are not updated, only created/deleted
                                         _ => dependency_patch::add(dependency),
                                     };
+                                    tracing::debug!(
+                                        dependency_id = %dependency.id,
+                                        "Pushing dependency patch to msg_store"
+                                    );
                                     msg_store_for_hook.push_patch(patch);
                                     return;
                                 }

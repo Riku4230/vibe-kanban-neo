@@ -195,6 +195,12 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
       }
     });
 
+    // Debug: Log when classification changes
+    console.log(`[DAGView] Tasks classified: ${inDag.length} in DAG, ${inPool.length} in pool`);
+    if (inDag.length > 0) {
+      console.log('[DAGView] DAG tasks:', inDag.map(t => ({ id: t.id.slice(0, 8), title: t.title, x: t.dag_position_x, y: t.dag_position_y })));
+    }
+
     return { dagTasks: inDag, poolTasks: inPool };
   }, [tasks]);
 
