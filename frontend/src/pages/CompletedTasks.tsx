@@ -479,10 +479,10 @@ export function CompletedTasks() {
 
   const taskListContent =
     !hasVisibleLocalTasks && !hasVisibleSharedTasks ? (
-      <div className="flex items-center justify-center h-full p-4">
+      <div className="flex items-center justify-center h-full min-h-[400px] p-4">
         <Card className="max-w-md w-full">
-          <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">
+          <CardContent className="flex items-center justify-center py-12">
+            <p className="text-muted-foreground text-center">
               {hasSearch
                 ? t('empty.noSearchResults')
                 : t('empty.noCompletedTasks', {

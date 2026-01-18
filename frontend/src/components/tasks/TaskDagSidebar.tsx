@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   MoreHorizontal,
   Inbox,
+  Archive,
 } from 'lucide-react';
 import type { TaskWithAttemptStatus } from 'shared/types';
 import { cn } from '@/lib/utils';
@@ -102,6 +103,8 @@ export interface TaskDagSidebarProps {
   onViewDetails: (task: TaskWithAttemptStatus) => void;
   /** Whether a DAG node is being dragged over this sidebar */
   isDropTarget?: boolean;
+  /** Whether a DAG node is being dragged over the archive zone */
+  isArchiveDropTarget?: boolean;
   /** Width of the sidebar in pixels */
   width?: number;
   /** Callback when width changes */
@@ -109,10 +112,11 @@ export interface TaskDagSidebarProps {
 }
 
 export const TaskDagSidebar = memo(forwardRef<HTMLDivElement, TaskDagSidebarProps>(
-  function TaskDagSidebar({ 
-    poolTasks, 
-    onViewDetails, 
+  function TaskDagSidebar({
+    poolTasks,
+    onViewDetails,
     isDropTarget = false,
+    isArchiveDropTarget = false,
     width: controlledWidth,
     onWidthChange,
   }, ref) {
@@ -247,11 +251,29 @@ export const TaskDagSidebar = memo(forwardRef<HTMLDivElement, TaskDagSidebarProp
         )}
       </div>
 
-      {/* Footer hint */}
-      <div className="p-3 border-t border-border bg-card/50">
-        <p className="text-xs text-muted-foreground text-center">
-          カードをドラッグしてDAGにドロップ
-        </p>
+      {/* Archive drop zone */}
+      <div
+        data-archive-zone
+        className={cn(
+          "p-4 border-t border-border transition-colors duration-200",
+          isArchiveDropTarget
+            ? "bg-emerald-100/80 dark:bg-emerald-900/40 border-emerald-400"
+            : "bg-card/50"
+        )}
+      >
+        {isArchiveDropTarget ? (
+          <div className="flex flex-col items-center justify-center py-2">
+            <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center mb-2">
+              <Archive className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">完了にする</p>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground">
+            <Archive className="w-4 h-4" />
+            <p className="text-xs">ここにドロップで完了</p>
+          </div>
+        )}
       </div>
 
       {/* Resize handle */}

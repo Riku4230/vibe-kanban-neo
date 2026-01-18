@@ -436,18 +436,55 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
 
   // State to track if dragging over sidebar
   const [isDraggingOverSidebar, setIsDraggingOverSidebar] = useState(false);
+  // State to track if dragging over archive zone
+  const [isDraggingOverArchive, setIsDraggingOverArchive] = useState(false);
   // Ref to track current value for use in callbacks (avoids stale closure)
   const isDraggingOverSidebarRef = useRef(false);
+  const isDraggingOverArchiveRef = useRef(false);
 
   // Keep ref in sync with state
   useEffect(() => {
     isDraggingOverSidebarRef.current = isDraggingOverSidebar;
   }, [isDraggingOverSidebar]);
 
-  // Helper to check if mouse is over sidebar
+  useEffect(() => {
+    isDraggingOverArchiveRef.current = isDraggingOverArchive;
+  }, [isDraggingOverArchive]);
+
+  // Helper to check if mouse is over sidebar (but not archive zone)
   const isOverSidebar = useCallback((clientX: number, clientY: number) => {
     if (!sidebarRef.current) return false;
     const rect = sidebarRef.current.getBoundingClientRect();
+    const isInSidebar =
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom;
+
+    if (!isInSidebar) return false;
+
+    // Check if over archive zone
+    const archiveZone = sidebarRef.current.querySelector('[data-archive-zone]');
+    if (archiveZone) {
+      const archiveRect = archiveZone.getBoundingClientRect();
+      if (
+        clientX >= archiveRect.left &&
+        clientX <= archiveRect.right &&
+        clientY >= archiveRect.top &&
+        clientY <= archiveRect.bottom
+      ) {
+        return false; // Over archive, not general sidebar
+      }
+    }
+    return true;
+  }, []);
+
+  // Helper to check if mouse is over archive zone
+  const isOverArchiveZone = useCallback((clientX: number, clientY: number) => {
+    if (!sidebarRef.current) return false;
+    const archiveZone = sidebarRef.current.querySelector('[data-archive-zone]');
+    if (!archiveZone) return false;
+    const rect = archiveZone.getBoundingClientRect();
     return (
       clientX >= rect.left &&
       clientX <= rect.right &&
@@ -465,16 +502,33 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
   const handleNodeDrag = useCallback(
     (event: React.MouseEvent) => {
       const overSidebar = isOverSidebar(event.clientX, event.clientY);
+      const overArchive = isOverArchiveZone(event.clientX, event.clientY);
       setIsDraggingOverSidebar(overSidebar);
+      setIsDraggingOverArchive(overArchive);
     },
-    [isOverSidebar]
+    [isOverSidebar, isOverArchiveZone]
   );
 
-  // Handle node drag stop - check if dropped on sidebar to move back to pool
+  // Handle node drag stop - check if dropped on sidebar or archive
   const handleNodeDragStop = useCallback(
     (_event: React.MouseEvent, node: Node<TaskNodeData>) => {
       // Use the ref to get the current value (avoids stale closure issue)
-      if (isDraggingOverSidebarRef.current) {
+      if (isDraggingOverArchiveRef.current) {
+        // Move task to archive by setting status to 'done' and clearing dag_position
+        updateTask.mutate({
+          taskId: node.id,
+          data: {
+            title: null,
+            description: null,
+            status: 'done',
+            parent_workspace_id: null,
+            image_ids: null,
+            dag_position_x: null,
+            dag_position_y: null,
+            clear_dag_position: true,
+          },
+        });
+      } else if (isDraggingOverSidebarRef.current) {
         // Move task back to pool by clearing dag_position
         updateTask.mutate({
           taskId: node.id,
@@ -493,6 +547,7 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
 
       // Reset drag state
       setIsDraggingOverSidebar(false);
+      setIsDraggingOverArchive(false);
     },
     [updateTask]
   );
@@ -506,6 +561,7 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
           poolTasks={poolTasks}
           onViewDetails={onViewDetails}
           isDropTarget={isDraggingOverSidebar}
+          isArchiveDropTarget={isDraggingOverArchive}
         />
 
       {/* Main DAG area */}
