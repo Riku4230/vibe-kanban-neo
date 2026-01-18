@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-export type TaskViewMode = 'kanban' | 'table' | 'dag';
+export type TaskViewMode = 'kanban' | 'table' | 'dag' | 'dashboard';
 
 const LOCAL_STORAGE_KEY = 'vibe-kanban-task-view-mode';
 
@@ -27,7 +27,7 @@ export function TaskViewProvider({ children }: TaskViewProviderProps) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const isValidViewMode = (mode: string | null): mode is TaskViewMode =>
-    mode === 'kanban' || mode === 'table' || mode === 'dag';
+    mode === 'kanban' || mode === 'table' || mode === 'dag' || mode === 'dashboard';
 
   // Initialize from URL param, then localStorage, then default to 'kanban'
   const [viewMode, setViewModeState] = useState<TaskViewMode>(() => {

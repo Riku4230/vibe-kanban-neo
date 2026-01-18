@@ -286,6 +286,34 @@ export function GeneralSettings() {
 
       <Card>
         <CardHeader>
+          <CardTitle>{t('settings.general.viewMode.title')}</CardTitle>
+          <CardDescription>
+            {t('settings.general.viewMode.description')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="simple-view-mode"
+              checked={draft?.simple_view_mode ?? false}
+              onCheckedChange={(checked: boolean) =>
+                updateDraft({ simple_view_mode: checked })
+              }
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="simple-view-mode" className="cursor-pointer">
+                {t('settings.general.viewMode.simpleMode.label')}
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.general.viewMode.simpleMode.helper')}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>{t('settings.general.editor.title')}</CardTitle>
           <CardDescription>
             {t('settings.general.editor.description')}

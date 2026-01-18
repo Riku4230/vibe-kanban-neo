@@ -255,21 +255,28 @@ export const TaskDagSidebar = memo(forwardRef<HTMLDivElement, TaskDagSidebarProp
       <div
         data-archive-zone
         className={cn(
-          "p-4 border-t border-border transition-colors duration-200",
+          "border-t border-border transition-colors duration-200 flex flex-col",
           isArchiveDropTarget
             ? "bg-emerald-100/80 dark:bg-emerald-900/40 border-emerald-400"
-            : "bg-card/50"
+            : "bg-card/50",
+          doneCount === 0 && !isArchiveDropTarget ? "flex-1 justify-center items-center min-h-0" : ""
         )}
       >
         {isArchiveDropTarget ? (
-          <div className="flex flex-col items-center justify-center py-2">
+          <div className="flex flex-col items-center justify-center p-4 py-2">
             <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center mb-2">
               <Archive className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">完了にする</p>
           </div>
+        ) : doneCount === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full px-4">
+            <div className="rounded-2xl bg-white dark:bg-slate-800/60 shadow-sm p-8 text-center">
+              <p className="text-sm text-foreground">完了したタスクはありません</p>
+            </div>
+          </div>
         ) : (
-          <div className="flex items-center justify-center gap-2 py-2 text-muted-foreground">
+          <div className="flex items-center justify-center gap-2 p-4 py-2 text-muted-foreground">
             <Archive className="w-4 h-4" />
             <p className="text-xs">ここにドロップで完了</p>
           </div>

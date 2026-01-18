@@ -41,6 +41,14 @@
           "helper": "Choose your preferred language. Browser Default follows your system language."
         }
       },
+      "viewMode": {
+        "title": "View Mode",
+        "description": "Configure how the task board is displayed.",
+        "simpleMode": {
+          "label": "Simple View Mode",
+          "helper": "Hide DAG view and dependency management features for a simpler interface."
+        }
+      },
       "taskExecution": {
         "title": "Default Coding Agent",
         "description": "Choose the default coding agent for tasks.",

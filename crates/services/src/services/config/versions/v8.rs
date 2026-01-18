@@ -45,6 +45,8 @@ pub struct Config {
     pub beta_workspaces: bool,
     #[serde(default)]
     pub beta_workspaces_invitation_sent: bool,
+    #[serde(default)]
+    pub simple_view_mode: bool,
 }
 
 impl Config {
@@ -72,6 +74,7 @@ impl Config {
             pr_auto_description_prompt: None,
             beta_workspaces: false,
             beta_workspaces_invitation_sent: false,
+            simple_view_mode: false,
         }
     }
 
@@ -124,6 +127,7 @@ impl Default for Config {
             pr_auto_description_prompt: None,
             beta_workspaces: false,
             beta_workspaces_invitation_sent: false,
+            simple_view_mode: false,
         }
     }
 }

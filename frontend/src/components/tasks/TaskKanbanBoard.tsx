@@ -35,6 +35,8 @@ interface TaskKanbanBoardProps {
   selectedSharedTaskId?: string | null;
   onCreateTask?: () => void;
   projectId: string;
+  /** Only show these statuses. If not provided, shows all statuses. */
+  visibleStatuses?: TaskStatus[];
 }
 
 function TaskKanbanBoard({
@@ -46,12 +48,20 @@ function TaskKanbanBoard({
   selectedSharedTaskId,
   onCreateTask,
   projectId,
+  visibleStatuses,
 }: TaskKanbanBoardProps) {
   const { userId } = useAuth();
 
+  // Filter columns based on visibleStatuses if provided
+  const filteredColumns = visibleStatuses
+    ? Object.entries(columns).filter(([status]) =>
+        visibleStatuses.includes(status as TaskStatus)
+      )
+    : Object.entries(columns);
+
   return (
     <KanbanProvider onDragEnd={onDragEnd}>
-      {Object.entries(columns).map(([status, items]) => {
+      {filteredColumns.map(([status, items]) => {
         const statusKey = status as TaskStatus;
         return (
           <KanbanBoard key={status} id={statusKey}>

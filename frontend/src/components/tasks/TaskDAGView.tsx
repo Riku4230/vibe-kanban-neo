@@ -291,8 +291,29 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
     setEdges(createEdges(dependencies, handleEdgeDelete, genresById));
   }, [dependencies, handleEdgeDelete, genresById, setEdges]);
 
+  // Save node positions to database
+  const saveNodePositions = useCallback((nodesToSave: Node<TaskNodeData>[]) => {
+    nodesToSave.forEach((node) => {
+      updateTask.mutate({
+        taskId: node.id,
+        data: {
+          title: null,
+          description: null,
+          status: null,
+          parent_workspace_id: null,
+          image_ids: null,
+          dag_position_x: node.position.x,
+          dag_position_y: node.position.y,
+          clear_dag_position: false,
+        },
+      });
+    });
+  }, [updateTask]);
+
   // Auto layout using dagre (Left to Right) or swimlane mode
-  const applyAutoLayout = useCallback((nodesToLayout: Node<TaskNodeData>[], edgesToLayout: Edge[]) => {
+  const applyAutoLayout = useCallback((nodesToLayout: Node<TaskNodeData>[], edgesToLayout: Edge[], savePositions = false) => {
+    let layoutedNodes: Node<TaskNodeData>[];
+
     if (swimlaneMode && genres.length > 0) {
       // Use swimlane layout
       const genreInfo = genres.map((g) => ({
@@ -306,11 +327,12 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
         nodeSpacing: 50,
         rankSpacing: 120,
       });
-      setNodes(result.nodes);
+      layoutedNodes = result.nodes;
+      setNodes(layoutedNodes);
       setSwimlaneLanes(result.lanes);
     } else {
       // Use standard dagre layout
-      const layoutedNodes = getLayoutedElements(nodesToLayout, edgesToLayout, {
+      layoutedNodes = getLayoutedElements(nodesToLayout, edgesToLayout, {
         direction: 'LR',
         nodeSpacing: 50,
         rankSpacing: 120,
@@ -318,14 +340,20 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
       setNodes(layoutedNodes);
       setSwimlaneLanes([]);
     }
+
+    // Save positions to database if requested
+    if (savePositions && layoutedNodes.length > 0) {
+      saveNodePositions(layoutedNodes);
+    }
+
     // Fit view after layout with a small delay to ensure nodes are positioned
     setTimeout(() => {
       fitView({ padding: 0.2, duration: 300 });
     }, 50);
-  }, [setNodes, fitView, swimlaneMode, genres]);
+  }, [setNodes, fitView, swimlaneMode, genres, saveNodePositions]);
 
   const onAutoLayout = useCallback(() => {
-    applyAutoLayout(nodes, edges);
+    applyAutoLayout(nodes, edges, true); // Save positions when user clicks auto-layout button
   }, [nodes, edges, applyAutoLayout]);
 
   // Stable count values to avoid infinite loops from array reference changes
@@ -509,7 +537,7 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
     [isOverSidebar, isOverArchiveZone]
   );
 
-  // Handle node drag stop - check if dropped on sidebar or archive
+  // Handle node drag stop - check if dropped on sidebar, archive, or save position in DAG
   const handleNodeDragStop = useCallback(
     (_event: React.MouseEvent, node: Node<TaskNodeData>) => {
       // Use the ref to get the current value (avoids stale closure issue)
@@ -541,6 +569,21 @@ const TaskDAGViewInner = memo(function TaskDAGViewInner({
             dag_position_x: null,
             dag_position_y: null,
             clear_dag_position: true,
+          },
+        });
+      } else {
+        // Save the new position in DAG area
+        updateTask.mutate({
+          taskId: node.id,
+          data: {
+            title: null,
+            description: null,
+            status: null,
+            parent_workspace_id: null,
+            image_ids: null,
+            dag_position_x: node.position.x,
+            dag_position_y: node.position.y,
+            clear_dag_position: false,
           },
         });
       }

@@ -79,6 +79,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { AttemptHeaderActions } from '@/components/panels/AttemptHeaderActions';
 import { TaskPanelHeaderActions } from '@/components/panels/TaskPanelHeaderActions';
+import { ProjectDashboard } from '@/components/dashboard';
 
 import type { TaskWithAttemptStatus, TaskStatus } from 'shared/types';
 
@@ -992,6 +993,11 @@ export function ProjectTasks() {
           </CardContent>
         </Card>
       </div>
+    ) : viewMode === 'dashboard' ? (
+      <ProjectDashboard
+        tasks={tasks}
+        onViewTaskDetails={handleViewTaskDetails}
+      />
     ) : viewMode === 'table' ? (
       <TaskTableView
         columns={kanbanColumns}
@@ -1025,7 +1031,7 @@ export function ProjectTasks() {
   const kanbanContent = (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-2 border-b shrink-0 gap-4">
-        {viewMode === 'dag' ? <TaskStatusTabs /> : <div />}
+        {viewMode === 'dag' && !config?.simple_view_mode ? <TaskStatusTabs /> : <div />}
         <ViewSwitcher />
       </div>
       <div className="flex-1 min-h-0">{taskListContent}</div>
