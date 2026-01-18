@@ -49,7 +49,7 @@ export default schemas;
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react({
       babel: {
@@ -96,5 +96,5 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["wa-sqlite"],
   },
-  build: { sourcemap: true },
-});
+  build: { sourcemap: mode !== 'production' },
+}));

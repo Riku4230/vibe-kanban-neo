@@ -28,6 +28,10 @@ pub async fn list_directory(
         Err(FilesystemError::PathIsNotDirectory) => {
             Ok(ResponseJson(ApiResponse::error("Path is not a directory")))
         }
+        Err(FilesystemError::PathTraversalAttempt) => {
+            tracing::warn!("Path traversal attempt detected");
+            Ok(ResponseJson(ApiResponse::error("Access denied: path outside allowed directory")))
+        }
         Err(FilesystemError::Io(e)) => {
             tracing::error!("Failed to read directory: {}", e);
             Ok(ResponseJson(ApiResponse::error(&format!(
@@ -60,6 +64,10 @@ pub async fn list_git_repos(
         }
         Err(FilesystemError::PathIsNotDirectory) => {
             Ok(ResponseJson(ApiResponse::error("Path is not a directory")))
+        }
+        Err(FilesystemError::PathTraversalAttempt) => {
+            tracing::warn!("Path traversal attempt detected in git repos scan");
+            Ok(ResponseJson(ApiResponse::error("Access denied: path outside allowed directory")))
         }
         Err(FilesystemError::Io(e)) => {
             tracing::error!("Failed to read directory: {}", e);

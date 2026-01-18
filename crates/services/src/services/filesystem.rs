@@ -24,6 +24,8 @@ pub enum FilesystemError {
     PathIsNotDirectory,
     #[error("Failed to read directory: {0}")]
     Io(#[from] std::io::Error),
+    #[error("Path traversal attempt detected: access denied")]
+    PathTraversalAttempt,
 }
 #[derive(Debug, Serialize, TS)]
 pub struct DirectoryListResponse {
@@ -313,6 +315,16 @@ impl FilesystemService {
         Ok(())
     }
 
+    fn validate_path_within_home(path: &Path) -> Result<PathBuf, FilesystemError> {
+        let home = Self::get_home_directory();
+        let canonical = path.canonicalize().map_err(|_| FilesystemError::DirectoryDoesNotExist)?;
+        let home_canonical = home.canonicalize().unwrap_or(home);
+        if !canonical.starts_with(&home_canonical) {
+            return Err(FilesystemError::PathTraversalAttempt);
+        }
+        Ok(canonical)
+    }
+
     pub async fn list_directory(
         &self,
         path: Option<String>,
@@ -321,6 +333,7 @@ impl FilesystemService {
             .map(PathBuf::from)
             .unwrap_or_else(Self::get_home_directory);
         Self::verify_directory(&path)?;
+        let path = Self::validate_path_within_home(&path)?;
 
         let entries = fs::read_dir(&path)?;
         let mut directory_entries = Vec::new();
@@ -361,5 +374,68 @@ impl FilesystemService {
             entries: directory_entries,
             current_path: path.to_string_lossy().to_string(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_path_traversal_absolute_blocked() {
+        let service = FilesystemService::new();
+        let result = service.list_directory(Some("/etc".to_string())).await;
+        assert!(
+            matches!(result, Err(FilesystemError::PathTraversalAttempt)),
+            "Expected PathTraversalAttempt error for /etc, got {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_path_traversal_relative_blocked() {
+        let service = FilesystemService::new();
+        let home = dirs::home_dir().unwrap();
+        let traversal_path = home.join("../../../etc");
+        let result = service
+            .list_directory(Some(traversal_path.to_string_lossy().to_string()))
+            .await;
+        assert!(
+            matches!(result, Err(FilesystemError::PathTraversalAttempt)),
+            "Expected PathTraversalAttempt error for relative traversal, got {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_home_directory_allowed() {
+        let service = FilesystemService::new();
+        let result = service.list_directory(None).await;
+        assert!(
+            result.is_ok(),
+            "Expected home directory access to be allowed, got {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_subdirectory_of_home_allowed() {
+        let service = FilesystemService::new();
+        let home = dirs::home_dir().unwrap();
+        if let Ok(entries) = std::fs::read_dir(&home) {
+            if let Some(entry) = entries
+                .filter_map(|e| e.ok())
+                .find(|e| e.path().is_dir())
+            {
+                let result = service
+                    .list_directory(Some(entry.path().to_string_lossy().to_string()))
+                    .await;
+                assert!(
+                    result.is_ok(),
+                    "Expected subdirectory of home to be allowed, got {:?}",
+                    result
+                );
+            }
+        }
     }
 }
