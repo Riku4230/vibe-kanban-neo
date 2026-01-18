@@ -49,6 +49,7 @@ import TaskKanbanBoard, {
 import { TaskTableView } from '@/components/tasks/TaskTableView';
 import { TaskDAGView } from '@/components/tasks/TaskDagView';
 import { ViewSwitcher } from '@/components/tasks/ViewSwitcher';
+import { TaskStatusTabs } from '@/components/tasks/TaskStatusTabs';
 import { useTaskView } from '@/contexts/TaskViewContext';
 import { useTaskFilters } from '@/contexts/TaskFiltersContext';
 import type { DragEndEvent } from '@/components/ui/shadcn-io/kanban';
@@ -1023,7 +1024,8 @@ export function ProjectTasks() {
 
   const kanbanContent = (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-end px-4 py-2 border-b shrink-0 gap-4">
+      <div className="flex items-center justify-between px-4 py-2 border-b shrink-0 gap-4">
+        {viewMode === 'dag' ? <TaskStatusTabs /> : <div />}
         <ViewSwitcher />
       </div>
       <div className="flex-1 min-h-0">{taskListContent}</div>
