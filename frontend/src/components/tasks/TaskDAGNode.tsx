@@ -7,7 +7,8 @@ import {
   Circle,
   Clock,
   Lock,
-  Play
+  Play,
+  Eye
 } from 'lucide-react';
 import type { TaskWithAttemptStatus, TaskReadiness } from 'shared/types';
 import { cn } from '@/lib/utils';
@@ -67,6 +68,22 @@ const STATUS_CONFIG = {
     iconColor: 'text-emerald-600 dark:text-emerald-400',
     Icon: CheckCircle2,
     label: 'Done',
+  },
+  inreview: {
+    borderColor: 'border-amber-400 dark:border-amber-500',
+    bgColor: 'bg-amber-50 dark:bg-amber-950/40',
+    iconBg: 'bg-amber-100 dark:bg-amber-900/60',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    Icon: Eye,
+    label: 'In Review',
+  },
+  cancelled: {
+    borderColor: 'border-red-400 dark:border-red-500',
+    bgColor: 'bg-red-50 dark:bg-red-950/40',
+    iconBg: 'bg-red-100 dark:bg-red-900/60',
+    iconColor: 'text-red-500 dark:text-red-400',
+    Icon: XCircle,
+    label: 'Cancelled',
   },
 } as const;
 
@@ -135,6 +152,10 @@ export const TaskDAGNode = memo(function TaskDAGNode({
           {/* In progress spinner */}
           {task.status === 'inprogress' && (
             <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+          )}
+          {/* In review indicator */}
+          {task.status === 'inreview' && (
+            <Eye className="h-4 w-4 text-amber-500" />
           )}
           {/* Failed indicator */}
           {task.last_attempt_failed && (
